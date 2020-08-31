@@ -1,3 +1,5 @@
+//https://github.com/yagop/node-telegram-bot-api/issues/675#issuecomment-435410894
+
 const TelegramBot = require('node-telegram-bot-api');
 var config = require('./config')
 var firebase = require('firebase')
