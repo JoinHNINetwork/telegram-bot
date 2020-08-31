@@ -1,20 +1,22 @@
 {
-  "name": "airdrop-bot",
+  "name": "telegram-bot",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JoinHNINetwork/telegram-bot.git"
+  },
   "author": "",
   "license": "ISC",
-  "dependencies": {
-    "firebase": "^5.0.4",
-    "node-telegram-bot-api": "^0.30.0",
-    "request": "^2.87.0",
-    "s": "^0.1.1"
+  "bugs": {
+    "url": "https://github.com/JoinHNINetwork/telegram-bot/issues"
   },
-  "devDependencies": {
-    "nodemon": "^1.17.5"
+  "homepage": "https://github.com/JoinHNINetwork/telegram-bot#readme",
+  "dependencies": {
+    "node-telegram-bot-api": "^0.50.0"
   }
 }
