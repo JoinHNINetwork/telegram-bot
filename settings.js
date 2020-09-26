@@ -1,8 +1,15 @@
 var settings = {
   telegramGroupURL: 'https://t.me/JoinHNINetwork',
   telegramGroupName: 'HNI Network',
+  thisTelegramBotURL: 'http://t.me/JoinHNINetworkBot',
+  tokenSymbol: 'HNI',
+
+  //Discord stuffs
+  discordLink: "https://discord.com/join/@todo",
 
   twitterURL: 'https://twitter.com/JoinHNINetwork',
+
+  logo: 'https://starkware.co/wp-content/uploads/2019/03/logotype.svg',
 
   defaultReferralCode: '439884226',
   inputFields: {
@@ -16,7 +23,7 @@ var settings = {
       errorMsg: 'Invalid Email address, enter again.'
     },
     twitter: {
-      title: 'Enter your Twitter Account (without "@" Ex: yourtwittername)',
+      title: 'Enter your Twitter Account (Ex: yourtwittername)',
       description: 'Email Address is mandatory',
       machine_name: 'twitter',
       required: true,
@@ -24,7 +31,7 @@ var settings = {
       checkDuplicate: true,
       errorMsg: 'Invalid twitter format, enter again.'
     },
-    eth_wallet:{
+    eth_wallet: {
       title: 'ETH address (No exchange wallet!)',
       description: 'ETH Address is mandatory',
       machine_name: 'eth_wallet',
@@ -32,6 +39,15 @@ var settings = {
       regex: /^0x[a-fA-F0-9]{40}$/g,
       checkDuplicate: true,
       errorMsg: 'Invalid Ethereum Address, enter again.'
+    },
+    discord: {
+      title: 'Discord User name',
+      description: 'Discord User name',
+      machine_name: 'eth_wallet',
+      required: true,
+      regex: /.+/s,
+      checkDuplicate: false,
+      errorMsg: ''
     },
   },
 
