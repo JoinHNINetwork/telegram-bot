@@ -60,14 +60,18 @@ function sendRules(msg, prefill = false) {
   var name = "<b>" + msg.from.first_name + "(" + msg.from.username + ")" + "</b>";
 
   var welcomeText = "Hello " + name + "\n\nWelcome to " + settings.telegramGroupName + "!\
-  Join our community and refer to get upto $1000 worth of "+ settings.tokenSymbol +" tokens.\n\n";
+  Join our community and refer to get upto $5000 worth of "+ settings.tokenSymbol +" tokens.\n\n";
+
+  welcomeText = welcomeText + "<b>Your referal link : </b>" + getReferralLink(msg.from.id);
+
+  welcomeText = welcomeText + "\n\n";
 
   var _data = {
     email: '',
     twitter: '',
     eth_wallet: '',
     discord: '',
-  };
+  };  
 
 
 
@@ -129,20 +133,37 @@ function sendRules(msg, prefill = false) {
   var initial_message = welcomeText + rules;
 
   bot.sendMessage(msg.chat.id, initial_message, _opt);
+
+  var _allfilled = getUnfilledField(tg_user_id, true);
+  if(_allfilled == -1) {
+    allFilled(msg);
+  }
 }
 
 //@todo recheck all
 function allFilled(msg) {
   
   var user = loadUser(msg.from.id);
+
+  //Perform invitation count 
+  var _invite_counts = getInvitesCounts(msg.from.id);
+  var invite_counts = 0;
+  if(_invite_counts && _invite_counts.cnt) {
+    invite_counts = _invite_counts.cnt;
+  }
+
+
+
+
   //clearDB(msg.from.id);
-  var _output = 'You already filled out the details! Thank you for being part of HNI Network community. Your details given below.\n\n';
+  var _output = 'You already filled out the details! Thank you for being part of ' + settings.telegramGroupName + '. Your details given below.\n\n';
   _output = _output + "<b>Name :</b> " + user.tg_username;
   _output = _output + "\n<b>Email :</b> " + user.email;
   _output = _output + "\n<b>Twitter ID :</b> " + user.twitter;
+  _output = _output + "\n<b>Discord Username :</b> " + user.discord;
   _output = _output + "\n<b>Eth wallet :</b> " + user.eth_wallet;
-  _output = _output + "\n\n<b>Total invites :</b> 0";
-  _output = _output + "\n<b>Total Earnings :</b> 10 HNI";
+  _output = _output + "\n\n<b>Total invites :</b> " + invite_counts; 
+  //_output = _output + "\n<b>Total Earnings :</b> ";
   _output = _output + "\n<b>Your Invite Link :</b> " + getReferralLink(msg.from.id);
   //_output = _output + "\nInvite rank : 10 HNI"; //@todo invite rank after certain users joined 
   bot.sendMessage(msg.chat.id, _output, _opt);
@@ -189,16 +210,19 @@ function askQuestion(field, msg) {
   bot.sendMessage(msg.chat.id, question, _opt);
 }
 
-function getUnfilledField(tg_user_id) {
+function getUnfilledField(tg_user_id, allfield_return_minus_1 = false) {
   var user = loadUser(tg_user_id);
   if(!user) {
     return false;
   }
-  var fields = ['email', 'twitter', 'eth_wallet', 'discord'];//@todo Automate this later 
+  var fields = [ 'twitter', 'discord' , 'email', 'eth_wallet'];//@todo Automate this later 
   for(let field in fields) {
     if(!user[fields[field]]) {
       return fields[field];
     }
+  }
+  if(allfield_return_minus_1) {
+    return -1;
   }
   return false;
 }
@@ -292,7 +316,17 @@ function updateUserField(tg_user_id, field, data) {
 
 //Get the number of invites by given user @todo
 function getInvitesCounts(tg_user_id) {
-
+  if(!parseInt(tg_user_id)) {
+    return false;
+  }
+  sqlite.connect(config.db); 
+  var sql = "SELECT count(*) as cnt FROM telegrambot WHERE referred_by = " + tg_user_id + ";";
+  var result = sqlite.run(sql);
+  sqlite.close();
+  if(_.size(result)) {
+    return result[0];
+  }
+  return false;  
 }
 
 function clearDB(tg_user_id) {
@@ -374,6 +408,13 @@ function commandParser(msg, match) {
     }
     
 }
+
+
+function checkUniqueField(tg_user_id, field_name, field_value) {
+  var _sql = "select count(*) as cnt from telegrambot where tg_user_id != " + tg_user_id + " AND " + field_name + " == '" + field_value + "';" ;
+  console.log(_sql);  
+}
+
 
 function isCommand(msg, find = '/start'){
   if(msg && msg.text && msg.text.startsWith(find)) {

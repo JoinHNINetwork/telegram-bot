@@ -1,27 +1,18 @@
 var settings = {
-  telegramGroupURL: 'https://t.me/JoinHNINetwork',
-  telegramGroupName: 'HNI Network',
-  thisTelegramBotURL: 'http://t.me/JoinHNINetworkBot',
-  tokenSymbol: 'HNI',
+  telegramGroupURL: 'http://t.me/FontCommunityGroup',
+  telegramGroupName: 'Font Community',
+  thisTelegramBotURL: 'http://t.me/FontCommunityBot',
+  tokenSymbol: '$FONT',
 
   //Discord stuffs
-  discordLink: "https://discord.com/join/@todo",
+  discordLink: "https://discord.gg/HW82aHx",
 
-  twitterURL: 'https://twitter.com/JoinHNINetwork',
+  twitterURL: 'https://twitter.com/FontCommunity',
 
-  logo: 'https://starkware.co/wp-content/uploads/2019/03/logotype.svg',
+  logo: 'https://font.community/wp-content/uploads/2020/10/logo-blue.png',
 
   defaultReferralCode: '439884226',
   inputFields: {
-    email: {
-      title: 'Enter your Email Address',
-      description: 'Email Address is mandatory',
-      machine_name: 'email',
-      required: true,
-      regex: /[A-Z0-9._%+-]+@[A-Z0-9.-]+.[A-Z]{2,4}/igm,
-      checkDuplicate: true,
-      errorMsg: 'Invalid Email address, enter again.'
-    },
     twitter: {
       title: 'Enter your Twitter Account (Ex: yourtwittername)',
       description: 'Email Address is mandatory',
@@ -31,15 +22,6 @@ var settings = {
       checkDuplicate: true,
       errorMsg: 'Invalid twitter format, enter again.'
     },
-    eth_wallet: {
-      title: 'ETH address (No exchange wallet!)',
-      description: 'ETH Address is mandatory',
-      machine_name: 'eth_wallet',
-      required: true,
-      regex: /^0x[a-fA-F0-9]{40}$/g,
-      checkDuplicate: true,
-      errorMsg: 'Invalid Ethereum Address, enter again.'
-    },
     discord: {
       title: 'Discord User name',
       description: 'Discord User name',
@@ -48,7 +30,27 @@ var settings = {
       regex: /.+/s,
       checkDuplicate: false,
       errorMsg: ''
+    },    
+    email: {
+      title: 'Enter your Email Address',
+      description: 'Email Address is mandatory',
+      machine_name: 'email',
+      required: true,
+      regex: /[A-Z0-9._%+-]+@[A-Z0-9.-]+.[A-Z]{2,4}/igm,
+      checkDuplicate: true,
+      errorMsg: 'Invalid Email address, enter again.'
     },
+
+    eth_wallet: {
+      title: 'ETH address (No exchange wallet!)',
+      description: 'ETH Address is mandatory',
+      machine_name: 'eth_wallet',
+      required: true,
+      regex: /^0x[a-fA-F0-9]{40}$/g,
+      checkDuplicate: true,
+      errorMsg: 'Invalid Ethereum Address, enter again.' 
+    },
+
   },
 
 };

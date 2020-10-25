@@ -2,9 +2,14 @@
 Description=Telegram Bot FONT
 
 [Service]
-ExecStart=/var/www/telegram-bot/index.js
+ExecStart=/usr/local/bin/node /var/www/telegram-bot/index.js
+WorkingDirectory=/var/www/telegram-bot
 Restart=always
+RestartSec=10
 User=nobody
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=tgbotfont
 # Note Debian/Ubuntu uses 'nogroup', RHEL/Fedora uses 'nobody'
 Group=nogroup
 Environment=PATH=/usr/bin:/usr/local/bin
