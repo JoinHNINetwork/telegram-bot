@@ -31,7 +31,7 @@ bot.on('new_chat_members', (msg) => {
 });
 
 bot.onText(/\/start(.+)/, (msg, match) => { // (.+)
-  commandParser(msg, match);
+  commandParser(msg, match); 
 })
 
 bot.onText(/\/start/, (msg, match) => { // (.+)
@@ -39,13 +39,50 @@ bot.onText(/\/start/, (msg, match) => { // (.+)
 })
 
 bot.on('message', (msg) => {
+  console.log("msg from message", msg);
   upsertUser(msg.from.id, msg.from.username, msg.from.first_name);
-  questionRepeater(msg);
+  var _quest = questionRepeater(msg);
+
 })
 
 //When Error
-bot.on("polling_error", (err) => console.log(err));
+bot.on("polling_error", (err) => tgDebug(err));
 
+// Listener (handler) for callback data from /label command
+bot.on('callback_query', (msg) => {
+   //console.log("msg from callback", msg);
+   const message = msg.message;
+   
+   //Callback query have different format, fix it
+   let _msg_updated = JSON.parse(JSON.stringify(message));
+
+   _msg_updated.from = msg.from;
+   delete _msg_updated.reply_markup;
+   //console.log("msg from callback modifed", _msg_updated);
+
+   const answer = msg.data; 
+   var _option_question = msg.message.reply_markup.inline_keyboard[0][0].text;
+   //@todo get this stuff from settings 
+   console.log("cbq 1");
+   switch(_option_question) {
+     case 'Done Step 1':
+       if(answer === '1') {
+         updateUserField(_msg_updated.from.id, 'sts_twitter_follow', 1);
+         questionRepeater(_msg_updated, true);
+         //console.log("cbq 2");
+         //setTimeout(function() {  }, 500);
+ 
+         
+         //console.log("cbq 3");
+       }
+     break;
+   } 
+});
+
+ 
+function fixMsgFromID(msg) {
+
+}
 
 //Send rules when /start typed
 //@todo prefill options
@@ -83,12 +120,9 @@ function sendRules(msg, prefill = false) {
 
   var rules = "<b>Airdrop Rules</b>:\n";
   
-  //Rule 1
-  rules = rules + "\n<pre>1. Join our " + settings.telegramGroupName + " Telegram group </pre>\n"
-  rules = rules + settings.telegramGroupURL + "\n";
 
   //Rule 2
-  rules = rules + "\n<pre>2. Follow our Twitter</pre> \n" + settings.twitterURL + " \n";
+  rules = rules + "\n<pre>1. Follow our Twitter, Like and Retweet the pinned tweet.</pre> \n" + settings.twitterURL + " \n";
   
   //Rule 3 get twitter ID
   var _isDone = "";
@@ -97,10 +131,10 @@ function sendRules(msg, prefill = false) {
     _isDone = _tick_mark;
     _answer = "<b>: " + userData.twitter + "</b>";
   }
-  rules = rules + "\n<pre>3." + _isDone + " Enter your Twitter ID " + _answer + ".</pre>";
+  rules = rules + "\n<pre>2." + _isDone + " Enter your Twitter ID " + _answer + ".</pre>";
 
   //Rule 4 Join the Discord Server
-  rules = rules + "\n<pre>4. Join our Discord</pre> \n" + settings.discordLink + " \n";
+  rules = rules + "\n<pre>3. Join our Discord</pre> \n" + settings.discordLink + " \n";
 
   //Rule 5 get discord ID
   var _isDone = "";
@@ -109,7 +143,7 @@ function sendRules(msg, prefill = false) {
     _isDone = _tick_mark;
     _answer = "<b>: " + userData.discord + "</b>";
   }
-  rules = rules + "\n<pre>5." + _isDone + " Enter your Discord Username" + _answer + ".</pre>";  
+  rules = rules + "\n<pre>4." + _isDone + " Enter your Discord Username" + _answer + ".</pre>";  
 
   // Rule 4 get the email id
   _isDone = "";
@@ -118,7 +152,7 @@ function sendRules(msg, prefill = false) {
     _isDone = _tick_mark;
     _answer = "<b>: " + userData.email + "</b>";
   }  
-  rules = rules + "\n<pre>6." + _isDone + " Enter your E-mail address" + _answer + ".</pre>";
+  rules = rules + "\n<pre>5." + _isDone + " Enter your E-mail address" + _answer + ".</pre>";
 
   _isDone = "";
   _answer = "";
@@ -126,17 +160,32 @@ function sendRules(msg, prefill = false) {
     _isDone = _tick_mark;
     _answer = "<b>: " + userData.eth_wallet + "</b>";
   }  
-  rules = rules + "\n<pre>7." + _isDone + " ETH address (No exchange wallet!)" + _answer + ".</pre>";
+  rules = rules + "\n<pre>6." + _isDone + " ETH address (No exchange wallet!)" + _answer + ".</pre>";
     
+
+  //Rule 7
+  rules = rules + "\n<pre>7. Join our " + settings.telegramGroupName + " Telegram group </pre>\n"
+  rules = rules + settings.telegramGroupURL + "\n";
+
     
 
   var initial_message = welcomeText + rules;
 
   bot.sendMessage(msg.chat.id, initial_message, _opt);
 
-  var _allfilled = getUnfilledField(tg_user_id, true);
+  var _allfilled = getUnfilledField(tg_user_id, true); 
+  
+  //Send all filled message if already filled
   if(_allfilled == -1) {
     allFilled(msg);
+  }
+  else {
+    questionRepeater(msg, true); 
+  }
+
+  //Ask first question after rules 
+  if(_allfilled && _allfilled !== -1) {
+    
   }
 }
 
@@ -166,48 +215,100 @@ function allFilled(msg) {
   //_output = _output + "\n<b>Total Earnings :</b> ";
   _output = _output + "\n<b>Your Invite Link :</b> " + getReferralLink(msg.from.id);
   //_output = _output + "\nInvite rank : 10 HNI"; //@todo invite rank after certain users joined 
-  bot.sendMessage(msg.chat.id, _output, _opt);
+  bot.sendMessage(msg.chat.id, _output, _opt); 
 }
 
-function questionRepeater(msg) {
+function questionRepeater(msg, commends_ok = false) {
 
+
+
+  //@todo
+  var msg_is_command = false;
   if(isCommand(msg)) {
-    return true;
+    if(commends_ok) {
+
+    }
+    else {
+      return false; // Current one is command
+    }
   }
 
   var _cur_question = getUnfilledField(msg.from.id);
+  var _load_user = loadUser(msg.from.id);
+  console.log("_cur_question", _cur_question, msg.from.id, _load_user);
   if(!_cur_question) {
-    allFilled(msg);
+    allFilled(msg); //Tell everything filled
     return false;
   }
-  //askQuestion(_cur_question, msg);
-  var _input = settings.inputFields[_cur_question];
-  var answer = msg.text;
+  getInput(_cur_question, msg).then((what) => {
+
   
-  if(answer && _input.regex.test(answer)) {
-    //Save the field 
-    updateUserField(msg.from.id, _cur_question, answer);
-    //Get next question
-    var _next_question = getUnfilledField(msg.from.id);
-    if(!_next_question) {
-      allFilled(msg);
-      return false;
-    }    
-    //Ask the next question
-    askQuestion(_next_question ,msg) 
-  }
-  else {
-    var _errorText = '<code>' + _input.errorMsg + '</code>';
-    bot.sendMessage(msg.chat.id, _errorText, _opt).then(() => {
-      var question = '<pre>' + _input.title + '</pre>';
-      bot.sendMessage(msg.chat.id, question, _opt);
-    });;
+    var _input = settings.inputFields[_cur_question];
+    var answer = msg.text.toLowerCase();
+  
+    if(answer && _input.regex.test(answer)) { //check the answer is valid 
+
+      //Check for the content to be unique
+      var _is_not_unique = checkUniqueField(msg.from.id, _cur_question, answer);
+
+
+      //Save the field 
+      if(_is_not_unique) {
+        var _errorText = '<code><b>Error! ' + _input.name + ' "' + answer + '" is already exist in our system. Please enter unique ID. </b></code>';
+        bot.sendMessage(msg.chat.id, _errorText, _opt).then(() => {
+          //var question = '<pre>' + _input.title + '</pre>';
+          //bot.sendMessage(msg.chat.id, question, _opt);
+        });;      
+      }
+      else {
+        if(settings.inputFields[_cur_question].type === 'input') {
+          updateUserField(msg.from.id, _cur_question, answer);  
+        }
+      }
+
+      //Get next question
+      var _next_question = getUnfilledField(msg.from.id);
+      if(!_next_question) {
+        allFilled(msg);
+        return false;
+      }    
+      //Ask the next question
+      //@todo put the recressive stuff here 
+      //getInput(_next_question ,msg) 
+    }
+    else {
+      var _errorText = '<code>' + _input.errorMsg + '</code>';
+      bot.sendMessage(msg.chat.id, _errorText, _opt).then(() => {
+        var question = '<pre>' + _input.title + '</pre>';
+        bot.sendMessage(msg.chat.id, question, _opt);
+      });;
+    }
+  });
+}
+
+function getInput(field, msg){
+  console.log("current input", field, settings.inputFields[field].type)
+  switch(settings.inputFields[field].type) {
+    case 'input':
+      return askQuestion(field, msg);
+    break;
+    case 'button':
+      return showOptions(field, msg);
+    break;
   }
 }
 
 function askQuestion(field, msg) {
+  console.log("askQuestion", field, msg);
   var question = '<pre>' + settings.inputFields[field].title + '</pre>';
-  bot.sendMessage(msg.chat.id, question, _opt);
+  return bot.sendMessage(msg.chat.id, question, _opt);
+}
+
+function showOptions(field, msg) {
+  var question = '<pre>' + settings.inputFields[field].title + '</pre>';
+  var __options = _opt;
+  __options.reply_markup = settings.inputFields[field].botOption.reply_markup;
+  return bot.sendMessage(msg.chat.id, question, __options);
 }
 
 function getUnfilledField(tg_user_id, allfield_return_minus_1 = false) {
@@ -215,7 +316,7 @@ function getUnfilledField(tg_user_id, allfield_return_minus_1 = false) {
   if(!user) {
     return false;
   }
-  var fields = [ 'twitter', 'discord' , 'email', 'eth_wallet'];//@todo Automate this later 
+  var fields = ['sts_twitter_follow', 'twitter', 'discord' , 'email', 'eth_wallet'];//@todo Automate this later 
   for(let field in fields) {
     if(!user[fields[field]]) {
       return fields[field];
@@ -245,7 +346,7 @@ function loadUser(tg_user_id) {
 }
 
 //Update an user by User ID
-function updateUser(tg_user_id, tg_username, tg_display_name, email = '', twitter = '', eth_wallet = '', discord = '', referred_by = '') {
+function updateUser(tg_user_id, tg_username, tg_display_name, email = null, twitter = null, eth_wallet = null, discord = null, referred_by = 0) {
   if(!parseInt(tg_user_id)) {
     return false;
   }
@@ -253,10 +354,10 @@ function updateUser(tg_user_id, tg_username, tg_display_name, email = '', twitte
   var row = {};
   if(tg_username) { row.tg_username = tg_username;}
   if(tg_display_name) { row.tg_display_name = tg_display_name;}
-  if(email) { row.email = email;}
-  if(twitter) { row.twitter = twitter;}
-  if(eth_wallet) { row.eth_wallet = eth_wallet;}
-  if(discord) { row.discord = discord;}
+  if(email) { row.email = email.toLowerCase();}
+  if(twitter) { row.twitter = twitter.toLowerCase();}
+  if(eth_wallet) { row.eth_wallet = eth_wallet.toLowerCase();}
+  if(discord) { row.discord = discord.toLowerCase();}
   if(referred_by) { row.referred_by = referred_by;}
 
   var count = sqlite.update("telegrambot", row, {tg_user_id: tg_user_id});
@@ -265,12 +366,12 @@ function updateUser(tg_user_id, tg_username, tg_display_name, email = '', twitte
   return count;
 }
 
-function upsertUser(tg_user_id, tg_username, tg_display_name, email = '', twitter = '', eth_wallet = '', discord = '', referred_by = '') {
+function upsertUser(tg_user_id, tg_username, tg_display_name, email = null, twitter = null, eth_wallet = null, discord = null, referred_by = 0) {
   if(!parseInt(tg_user_id)) {
     return false;
   }   
   var user = loadUser(tg_user_id);
-  console.log("loaded user", tg_user_id, tg_username,tg_display_name, user);
+  //console.log("loaded user", tg_user_id, tg_username,tg_display_name, user);
   if(user) {
     return updateUser(tg_user_id, tg_username, tg_display_name, email, twitter, eth_wallet, discord, referred_by);
   }
@@ -280,23 +381,23 @@ function upsertUser(tg_user_id, tg_username, tg_display_name, email = '', twitte
 }
 
 //Create user in table
-function createUser(tg_user_id, tg_username, tg_display_name, email = '', twitter = '', eth_wallet = '', discord = '', referred_by = '') {
+function createUser(tg_user_id, tg_username, tg_display_name, email = null, twitter = null, eth_wallet = null, discord = null, referred_by = 0) {
   if(!parseInt(tg_user_id)) {
     return false;
   }  
 
   sqlite.connect(config.db); 
-  var row  = {
-    tg_user_id: tg_user_id,
-    tg_username: tg_username,
-    tg_display_name: tg_display_name,
-    email: email,
-    twitter: twitter,
-    eth_wallet: eth_wallet,
-    discord: discord,
-    referred_by: referred_by,
-    created: Math.floor(Date.now() / 1000),
-  };
+  var row = {};
+  row.created = Math.floor(Date.now() / 1000);
+  if(tg_username) { row.tg_username = tg_username;}
+  if(tg_display_name) { row.tg_display_name = tg_display_name;}
+  if(email) { row.email = email.toLowerCase();}
+  if(twitter) { row.twitter = twitter.toLowerCase();}
+  if(eth_wallet) { row.eth_wallet = eth_wallet.toLowerCase();}
+  if(discord) { row.discord = discord.toLowerCase();}
+  if(referred_by) { row.referred_by = referred_by;}
+  if(tg_user_id) { row.tg_user_id = tg_user_id;}  
+
   sqlite.insert("telegrambot",row, function(res){
     if(res.error)
       throw res.error;
@@ -308,9 +409,18 @@ function updateUserField(tg_user_id, field, data) {
   sqlite.connect(config.db); 
   var row = {};
   row[field] = data;
-  var count = sqlite.update("telegrambot", row, {tg_user_id: tg_user_id});
-  sqlite.close();
+  var condition = {
+    tg_user_id: tg_user_id,
+  };
+  var count = sqlite.update("telegrambot", row, condition);
+  //sqlite.close();
+  console.log("updateUserField", row, count); 
+  
   return count;
+}
+
+function updatedbcb(){
+  console.log("updatedbcb", loadUser(439884226));
 }
 
 
@@ -342,10 +452,10 @@ function setup() {
     `tg_user_id` INTEGER PRIMARY KEY,\
     `tg_username` TEXT,\
     `tg_display_name` TEXT,\
-    `email` TEXT NOT NULL UNIQUE,\
-    `twitter` TEXT NOT NULL,\
-    `eth_wallet` TEXT NOT NULL UNIQUE,\
-    `discord` TEXT NOT NULL,\
+    `email` TEXT NULL,\
+    `twitter` TEXT NULL,\
+    `eth_wallet` TEXT NULL,\
+    `discord` TEXT NULL,\
     `referred_by` INTEGER DEFAULT 0,\
     `created` INTEGER,\
     `sts_tg_group` INTEGER DEFAULT 0,\
@@ -354,7 +464,7 @@ function setup() {
   );";
   sqlite.run(sql,function(res){
     if(res.error)
-      throw res.error;
+      throw res.error; 
     console.log(res);
   });
   sqlite.close();
@@ -393,11 +503,11 @@ function commandParser(msg, match) {
    
     if(!next_question) {
       //Send the rules
-      console.log("inside the command parser");
+      //console.log("inside the command parser");
       //sendRules(msg);
     }
 
-    console.log("comnnads", msg, match);
+    
       
     //Converstion 
     if(!isCommand(msg)) {
@@ -411,8 +521,25 @@ function commandParser(msg, match) {
 
 
 function checkUniqueField(tg_user_id, field_name, field_value) {
-  var _sql = "select count(*) as cnt from telegrambot where tg_user_id != " + tg_user_id + " AND " + field_name + " == '" + field_value + "';" ;
-  console.log(_sql);  
+    
+  if(!parseInt(tg_user_id)) {
+    return false;
+  }
+  if(field_value) {
+    field_value = field_value.toLowerCase();
+  }
+  sqlite.connect(config.db); 
+  var sql = "select count(*) as cnt from telegrambot where tg_user_id != " + tg_user_id + " AND " + field_name + " == '" + field_value + "';" ;
+  var result = sqlite.run(sql);
+  console.log("duplicate", arguments, result);
+  var result_counts = 0;
+  if(_.size(result) && result[0] && parseInt(result[0].cnt)) {
+    result_counts = parseInt(result[0].cnt);
+    sqlite.close();
+    return result_counts;
+  }
+  sqlite.close();
+  return false;  
 }
 
 
@@ -421,6 +548,11 @@ function isCommand(msg, find = '/start'){
     return true;
   }
   return false;
+}
+
+
+function tgDebug(){
+  console.log(arguments);
 }
 
 function getCommandArgumets(str, command = '/start ') {
