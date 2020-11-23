@@ -8,85 +8,38 @@ var sqlite = require('sqlite-sync'); //requiring
 var token = config.token;
 
 
+
 // Create a bot that uses 'polling' to fetch new updates
-const bot = new TelegramBot(token, {polling: true});
+//const bot = new TelegramBot(token, {polling: true});
 const img_url = settings.logo;
 
-
-
-//Setup the database
-setup();
-
-
 //Settings 
+//Todo move to 
 var _opt = {
   parse_mode: 'HTML',
   disable_web_page_preview: true
 }
 
-//When new user join the chat 
-bot.on('new_chat_members', (msg) => {
-  sendRules(msg);
-  upsertUser(msg.from.id, msg.from.username, msg.from.first_name);
-});
 
-bot.onText(/\/start(.+)/, (msg, match) => { // (.+)
-  commandParser(msg, match); 
-})
 
-bot.onText(/\/start/, (msg, match) => { // (.+)
-  commandParser(msg, match);
-})
-
-bot.on('message', (msg) => {
-  console.log("msg from message", msg);
-  upsertUser(msg.from.id, msg.from.username, msg.from.first_name);
-  var _quest = questionRepeater(msg);
-
-})
-
-//When Error
-bot.on("polling_error", (err) => tgDebug(err));
-
-// Listener (handler) for callback data from /label command
-bot.on('callback_query', (msg) => {
-   //console.log("msg from callback", msg);
-   const message = msg.message;
-   
-   //Callback query have different format, fix it
-   let _msg_updated = JSON.parse(JSON.stringify(message));
-
-   _msg_updated.from = msg.from;
-   delete _msg_updated.reply_markup;
-   //console.log("msg from callback modifed", _msg_updated);
-
-   const answer = msg.data; 
-   var _option_question = msg.message.reply_markup.inline_keyboard[0][0].text;
-   //@todo get this stuff from settings 
-   console.log("cbq 1");
-   switch(_option_question) {
-     case 'Done Step 1':
-       if(answer === '1') {
-         updateUserField(_msg_updated.from.id, 'sts_twitter_follow', 1);
-         questionRepeater(_msg_updated, true);
-         //console.log("cbq 2");
-         //setTimeout(function() {  }, 500);
- 
-         
-         //console.log("cbq 3");
-       }
-     break;
-   } 
-});
-
- 
-function fixMsgFromID(msg) {
-
+// get input from user and dispatch based on input type
+function getInput(field, msg, bot){
+  console.log("current input", field, settings.inputFields[field].type)
+  switch(settings.inputFields[field].type) {
+    case 'input':
+      return askQuestion(field, msg, bot);
+    break;
+    case 'button':
+      return showOptions(field, msg, bot);
+    break;
+  }
 }
+exports.getInput = getInput;
+
 
 //Send rules when /start typed
 //@todo prefill options
-function sendRules(msg, prefill = false) {
+function sendRules(msg, bot, prefill = false) {
 
   if(!msg) {
     return false;
@@ -110,8 +63,6 @@ function sendRules(msg, prefill = false) {
     discord: '',
   };  
 
-
-
   var tg_user_id = msg.from.id;
   var userData = null;
   if(tg_user_id) {
@@ -119,7 +70,6 @@ function sendRules(msg, prefill = false) {
   }
 
   var rules = "<b>Airdrop Rules</b>:\n";
-  
 
   //Rule 2
   rules = rules + "\n<pre>1. Follow our Twitter, Like and Retweet the pinned tweet.</pre> \n" + settings.twitterURL + " \n";
@@ -177,10 +127,10 @@ function sendRules(msg, prefill = false) {
   
   //Send all filled message if already filled
   if(_allfilled == -1) {
-    allFilled(msg);
+    allFilled(msg, bot);
   }
   else {
-    questionRepeater(msg, true); 
+    questionRepeater(msg, bot, true); 
   }
 
   //Ask first question after rules 
@@ -188,9 +138,12 @@ function sendRules(msg, prefill = false) {
     
   }
 }
+exports.sendRules = sendRules;
+
+
 
 //@todo recheck all
-function allFilled(msg) {
+function allFilled(msg, bot) {
   
   var user = loadUser(msg.from.id);
 
@@ -200,8 +153,6 @@ function allFilled(msg) {
   if(_invite_counts && _invite_counts.cnt) {
     invite_counts = _invite_counts.cnt;
   }
-
-
 
 
   //clearDB(msg.from.id);
@@ -217,11 +168,11 @@ function allFilled(msg) {
   //_output = _output + "\nInvite rank : 10 HNI"; //@todo invite rank after certain users joined 
   bot.sendMessage(msg.chat.id, _output, _opt); 
 }
-
-function questionRepeater(msg, commends_ok = false) {
-
+exports.allFilled = allFilled;
 
 
+//Repeats the unfinished question again and again
+function questionRepeater(msg, bot, commends_ok = false) {
   //@todo
   var msg_is_command = false;
   if(isCommand(msg)) {
@@ -237,10 +188,10 @@ function questionRepeater(msg, commends_ok = false) {
   var _load_user = loadUser(msg.from.id);
   console.log("_cur_question", _cur_question, msg.from.id, _load_user);
   if(!_cur_question) {
-    allFilled(msg); //Tell everything filled
+    allFilled(msg, bot); //Tell everything filled
     return false;
   }
-  getInput(_cur_question, msg).then((what) => {
+  getInput(_cur_question, msg, bot).then((what) => {
 
   
     var _input = settings.inputFields[_cur_question];
@@ -269,7 +220,7 @@ function questionRepeater(msg, commends_ok = false) {
       //Get next question
       var _next_question = getUnfilledField(msg.from.id);
       if(!_next_question) {
-        allFilled(msg);
+        allFilled(msg, bot);
         return false;
       }    
       //Ask the next question
@@ -285,48 +236,28 @@ function questionRepeater(msg, commends_ok = false) {
     }
   });
 }
+exports.questionRepeater = questionRepeater;
 
-function getInput(field, msg){
-  console.log("current input", field, settings.inputFields[field].type)
-  switch(settings.inputFields[field].type) {
-    case 'input':
-      return askQuestion(field, msg);
-    break;
-    case 'button':
-      return showOptions(field, msg);
-    break;
-  }
-}
 
-function askQuestion(field, msg) {
+
+function askQuestion(field, msg, bot) {
   console.log("askQuestion", field, msg);
   var question = '<pre>' + settings.inputFields[field].title + '</pre>';
   return bot.sendMessage(msg.chat.id, question, _opt);
 }
+exports.askQuestion = askQuestion;
 
-function showOptions(field, msg) {
+
+
+function showOptions(field, msg, bot) {
   var question = '<pre>' + settings.inputFields[field].title + '</pre>';
   var __options = _opt;
   __options.reply_markup = settings.inputFields[field].botOption.reply_markup;
   return bot.sendMessage(msg.chat.id, question, __options);
 }
+exports.showOptions = showOptions;
 
-function getUnfilledField(tg_user_id, allfield_return_minus_1 = false) {
-  var user = loadUser(tg_user_id);
-  if(!user) {
-    return false;
-  }
-  var fields = ['sts_twitter_follow', 'twitter', 'discord' , 'email', 'eth_wallet'];//@todo Automate this later 
-  for(let field in fields) {
-    if(!user[fields[field]]) {
-      return fields[field];
-    }
-  }
-  if(allfield_return_minus_1) {
-    return -1;
-  }
-  return false;
-}
+
 
 //this function gets the record of current user
 //return false if new user
@@ -344,41 +275,83 @@ function loadUser(tg_user_id) {
   }
   return false;
 }
+exports.loadUser = loadUser;
 
-//Update an user by User ID
-function updateUser(tg_user_id, tg_username, tg_display_name, email = null, twitter = null, eth_wallet = null, discord = null, referred_by = 0) {
+
+//Check if field value is unique for given user
+function checkUniqueField(tg_user_id, field_name, field_value) {    
+  if(!parseInt(tg_user_id)) {
+    return false;
+  }
+  if(field_value) {
+    field_value = field_value.toLowerCase();
+  }
+  sqlite.connect(config.db); 
+  var sql = "select count(*) as cnt from telegrambot where tg_user_id != " + tg_user_id + " AND " + field_name + " == '" + field_value + "';" ;
+  var result = sqlite.run(sql);
+  console.log("duplicate", arguments, result);
+  var result_counts = 0;
+  if(_.size(result) && result[0] && parseInt(result[0].cnt)) {
+    result_counts = parseInt(result[0].cnt);
+    sqlite.close();
+    return result_counts;
+  }
+  sqlite.close();
+  return false;  
+}
+exports.checkUniqueField = checkUniqueField;
+
+
+//Get the number of invites by given user @todo
+function getInvitesCounts(tg_user_id) {
   if(!parseInt(tg_user_id)) {
     return false;
   }
   sqlite.connect(config.db); 
-  var row = {};
-  if(tg_username) { row.tg_username = tg_username;}
-  if(tg_display_name) { row.tg_display_name = tg_display_name;}
-  if(email) { row.email = email.toLowerCase();}
-  if(twitter) { row.twitter = twitter.toLowerCase();}
-  if(eth_wallet) { row.eth_wallet = eth_wallet.toLowerCase();}
-  if(discord) { row.discord = discord.toLowerCase();}
-  if(referred_by) { row.referred_by = referred_by;}
-
-  var count = sqlite.update("telegrambot", row, {tg_user_id: tg_user_id});
+  var sql = "SELECT count(*) as cnt FROM telegrambot WHERE referred_by = " + tg_user_id + ";";
+  var result = sqlite.run(sql);
   sqlite.close();
-
-  return count;
+  if(_.size(result)) {
+    return result[0];
+  }
+  return false;  
 }
+exports.getInvitesCounts = getInvitesCounts;
 
-function upsertUser(tg_user_id, tg_username, tg_display_name, email = null, twitter = null, eth_wallet = null, discord = null, referred_by = 0) {
-  if(!parseInt(tg_user_id)) {
-    return false;
-  }   
+
+
+
+//Get unfilled field for given user
+function getUnfilledField(tg_user_id, allfield_return_minus_1 = false) {
   var user = loadUser(tg_user_id);
-  //console.log("loaded user", tg_user_id, tg_username,tg_display_name, user);
-  if(user) {
-    return updateUser(tg_user_id, tg_username, tg_display_name, email, twitter, eth_wallet, discord, referred_by);
+  if(!user) {
+    return false;
   }
-  else {    
-    return createUser(tg_user_id, tg_username, tg_display_name, email, twitter, eth_wallet, discord, referred_by);
+  var fields = ['sts_twitter_follow', 'twitter', 'discord' , 'email', 'eth_wallet'];//@todo Automate this later 
+  for(let field in fields) {
+    if(!user[fields[field]]) {
+      return fields[field];
+    }
   }
+  if(allfield_return_minus_1) {
+    return -1;
+  }
+  return false;
 }
+exports.getUnfilledField = getUnfilledField;
+
+
+
+//Clear DB of specific user
+//@todo
+function clearDB(tg_user_id) {
+  sqlite.connect(config.db); 
+ // sqlite.delete('telegrambot', {tg_user_id:tg_user_id} );
+  sqlite.close();
+}
+exports.clearDB = clearDB;
+
+
 
 //Create user in table
 function createUser(tg_user_id, tg_username, tg_display_name, email = null, twitter = null, eth_wallet = null, discord = null, referred_by = 0) {
@@ -404,7 +377,73 @@ function createUser(tg_user_id, tg_username, tg_display_name, email = null, twit
   });
   sqlite.close();
 }
+exports.createUser = createUser;
 
+
+//Get unfilled field of an user
+function getUnfilledField(tg_user_id, allfield_return_minus_1 = false) {
+  var user = loadUser(tg_user_id);
+  if(!user) {
+    return false;
+  }
+  var fields = ['sts_twitter_follow', 'twitter', 'discord' , 'email', 'eth_wallet'];//@todo Automate this later 
+  for(let field in fields) {
+    if(!user[fields[field]]) {
+      return fields[field];
+    }
+  }
+  if(allfield_return_minus_1) {
+    return -1;
+  }
+  return false;
+}
+exports.getUnfilledField = getUnfilledField;
+
+
+
+//Update an user by User ID
+function updateUser(tg_user_id, tg_username, tg_display_name, email = null, twitter = null, eth_wallet = null, discord = null, referred_by = 0) {
+  if(!parseInt(tg_user_id)) {
+    return false;
+  }
+  sqlite.connect(config.db); 
+  var row = {};
+  if(tg_username) { row.tg_username = tg_username;}
+  if(tg_display_name) { row.tg_display_name = tg_display_name;}
+  if(email) { row.email = email.toLowerCase();}
+  if(twitter) { row.twitter = twitter.toLowerCase();}
+  if(eth_wallet) { row.eth_wallet = eth_wallet.toLowerCase();}
+  if(discord) { row.discord = discord.toLowerCase();}
+  if(referred_by) { row.referred_by = referred_by;}
+
+  var count = sqlite.update("telegrambot", row, {tg_user_id: tg_user_id});
+  sqlite.close();
+
+  return count;
+}
+exports.updateUser = updateUser;
+
+
+//insert or update a user
+function upsertUser(tg_user_id, tg_username, tg_display_name, email = null, twitter = null, eth_wallet = null, discord = null, referred_by = 0) {
+  if(!parseInt(tg_user_id)) {
+    return false;
+  }   
+  var user = loadUser(tg_user_id);
+  //console.log("loaded user", tg_user_id, tg_username,tg_display_name, user);
+  if(user) {
+    return updateUser(tg_user_id, tg_username, tg_display_name, email, twitter, eth_wallet, discord, referred_by);
+  }
+  else {    
+    return createUser(tg_user_id, tg_username, tg_display_name, email, twitter, eth_wallet, discord, referred_by);
+  }
+}
+exports.upsertUser = upsertUser;
+
+
+
+
+//Update a single user field data
 function updateUserField(tg_user_id, field, data) {
   sqlite.connect(config.db); 
   var row = {};
@@ -413,42 +452,22 @@ function updateUserField(tg_user_id, field, data) {
     tg_user_id: tg_user_id,
   };
   var count = sqlite.update("telegrambot", row, condition);
-  //sqlite.close();
+  sqlite.close();
   console.log("updateUserField", row, count); 
   
   return count;
 }
-
-function updatedbcb(){
-  console.log("updatedbcb", loadUser(439884226));
-}
+exports.updateUserField = updateUserField;
 
 
-//Get the number of invites by given user @todo
-function getInvitesCounts(tg_user_id) {
-  if(!parseInt(tg_user_id)) {
-    return false;
+//Setup the database table
+function setupTable(tablename) {
+  if(!tablename) {
+    tablename = 'telegrambot';
   }
-  sqlite.connect(config.db); 
-  var sql = "SELECT count(*) as cnt FROM telegrambot WHERE referred_by = " + tg_user_id + ";";
-  var result = sqlite.run(sql);
-  sqlite.close();
-  if(_.size(result)) {
-    return result[0];
-  }
-  return false;  
-}
 
-function clearDB(tg_user_id) {
   sqlite.connect(config.db); 
- // sqlite.delete('telegrambot', {tg_user_id:tg_user_id} );
-  sqlite.close();
-
-}
-
-function setup() {
-  sqlite.connect(config.db); 
-  var sql = "CREATE TABLE IF NOT EXISTS telegrambot (\
+  var sql = "CREATE TABLE IF NOT EXISTS " + tablename + " (\
     `tg_user_id` INTEGER PRIMARY KEY,\
     `tg_username` TEXT,\
     `tg_display_name` TEXT,\
@@ -469,16 +488,28 @@ function setup() {
   });
   sqlite.close();
 }
+exports.setupTable = setupTable;
 
-//Compose the referal link
-function getReferralLink(tg_user_id) {
-  if(!tg_user_id) {
-    tg_user_id = settings.defaultReferralCode;
-  }
-  return settings.thisTelegramBotURL + "?start=" + tg_user_id;
+
+
+//Function that prints console log
+function tgDebug(){
+  console.log(arguments);
 }
+exports.tgDebug = tgDebug;
 
-function commandParser(msg, match) {
+
+//Check if this function is a command
+function isCommand(msg, find = '/start'){
+  if(msg && msg.text && msg.text.startsWith(find)) {
+    return true;
+  }
+  return false;
+}
+exports.isCommand = isCommand;
+
+//Parse the command/input and dispatch the actions
+function commandParser(msg, match, bot) {
 
     var name = msg.chat.first_name + " (@" + msg.chat.username + ")";
     var username = msg.chat.username;
@@ -511,50 +542,17 @@ function commandParser(msg, match) {
       
     //Converstion 
     if(!isCommand(msg)) {
-      questionRepeater(msg);  
+      questionRepeater(msg, bot);  
     }
     else {
-      sendRules(msg, true);
+      sendRules(msg, bot, true);
     }
     
 }
+exports.commandParser = commandParser;
 
 
-function checkUniqueField(tg_user_id, field_name, field_value) {
-    
-  if(!parseInt(tg_user_id)) {
-    return false;
-  }
-  if(field_value) {
-    field_value = field_value.toLowerCase();
-  }
-  sqlite.connect(config.db); 
-  var sql = "select count(*) as cnt from telegrambot where tg_user_id != " + tg_user_id + " AND " + field_name + " == '" + field_value + "';" ;
-  var result = sqlite.run(sql);
-  console.log("duplicate", arguments, result);
-  var result_counts = 0;
-  if(_.size(result) && result[0] && parseInt(result[0].cnt)) {
-    result_counts = parseInt(result[0].cnt);
-    sqlite.close();
-    return result_counts;
-  }
-  sqlite.close();
-  return false;  
-}
-
-
-function isCommand(msg, find = '/start'){
-  if(msg && msg.text && msg.text.startsWith(find)) {
-    return true;
-  }
-  return false;
-}
-
-
-function tgDebug(){
-  console.log(arguments);
-}
-
+//Get the command arguments
 function getCommandArgumets(str, command = '/start ') {
   var items = str.split(command);
   if(items && items[1]) {
@@ -562,3 +560,14 @@ function getCommandArgumets(str, command = '/start ') {
   }
   return '';
 }
+exports.getCommandArgumets = getCommandArgumets;
+
+
+//Compose the referal link from TG user id
+function getReferralLink(tg_user_id) {
+  if(!tg_user_id) {
+    tg_user_id = settings.defaultReferralCode;
+  }
+  return settings.thisTelegramBotURL + "?start=" + tg_user_id;
+}
+exports.getReferralLink = getReferralLink;
