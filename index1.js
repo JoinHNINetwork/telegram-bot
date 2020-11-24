@@ -4,6 +4,7 @@ const config = require('./config')
 const settings = require('./settings').settings
 var sqlite = require('sqlite-sync'); //requiring
 var tgBot = require('./tgBotLib'); //requiring
+const util = require('util')
 
 
 var token = config.token;
@@ -24,7 +25,7 @@ tgBot.setupTable('telegrambot');
 //When new user join the chat 
 bot.on('new_chat_members', (msg) => {
 
-  console.log("msg from new_chat_members", msg); 
+  
 
   //tgBot.sendRules(msg, bot);
   //tgBot.upsertUser(msg.from.id, msg.from.username, msg.from.first_name);
@@ -32,41 +33,31 @@ bot.on('new_chat_members', (msg) => {
 
 //Record the inviter
 bot.onText(/\/start(.+)/, (msg, match) => { // (.+)
-  var tg_user_id = parseInt(msg.text.trim().substring(6).trim());
+  var tg_user_id = tgBot.getReferralCode(msg, match);
   if(tg_user_id) {
-    console.log("msg from onText 1, only executs where there is referral id", msg);
     tgBot.upsertUser(msg.from.id, msg.from.username, msg.from.first_name, "", "", "", "", tg_user_id);
-    tgBot.commandParser(msg, match, bot);  
   }
   else {
-
+    tgBot.upsertUser(msg.from.id, msg.from.username, msg.from.first_name);
   }
+  tgBot.commandParser(msg, match, bot);  
 })
 
 //on just with start 
 bot.onText(/\/start/, (msg, match) => { // (.+)
   var text = msg.text.trim().substring(6).trim();
   if(!text) {
-    console.log("msg from onText 2, only if /start without any extra data", msg);
+    tgBot.upsertUser(msg.from.id, msg.from.username, msg.from.first_name);
     tgBot.commandParser(msg, match, bot);  
   }
 })
 
 bot.on('message', (msg) => {
-
   if(!msg.text.startsWith("/start")) {
+    console.log("msg, msg, msg");
     tgBot.upsertUser(msg.from.id, msg.from.username, msg.from.first_name);
-    var _quest = tgBot.questionRepeater(msg, bot);
-  }
-
-  /*
-  var tg_user_id = parseInt(msg.text.trim().substring(6).trim());
-  if(!tg_user_id) {
-    console.log("msg from message, executs only when not start with referral number", msg);
-    
-    //
-  }
-  */
+    var _quest = tgBot.taskRepeater(msg, bot);
+  } 
 }) 
 
 //When Error
@@ -77,6 +68,9 @@ bot.on('callback_query', (msg) => {
    //console.log("msg from callback", msg);
    const message = msg.message;
    
+   //console.log(util.inspect(msg, false, null, true /* enable colors */));
+
+
    //Callback query have different format, fix it
    let _msg_updated = JSON.parse(JSON.stringify(message));
 
@@ -87,15 +81,23 @@ bot.on('callback_query', (msg) => {
    const answer = msg.data; 
    var _option_question = msg.message.reply_markup.inline_keyboard[0][0].text;
    //@todo get this stuff from settings 
-   console.log("cbq 1");
+   tgBot.checkMsgReplyMarkup(msg);
    switch(_option_question) {
      case 'Done Step 1':
        if(answer === '1') {
          tgBot.updateUserField(_msg_updated.from.id, 'sts_twitter_follow', 1);
-         tgBot.questionRepeater(_msg_updated, bot, true);
+         
+         tgBot.askNextQuestion(_msg_updated, bot, false); //@todo ask next question directly 
+
 
        }
+     break; 
+     case 'Done Step 2':
+
+
      break;
+
+
    } 
 });
 

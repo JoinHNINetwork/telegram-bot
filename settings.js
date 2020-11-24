@@ -20,6 +20,7 @@ var settings = {
       required: true,
       type: 'button',
       regex: /.+/s,
+
       botOption: {
         'reply_markup': {
           'inline_keyboard': [[
@@ -43,6 +44,7 @@ var settings = {
       machine_name: 'twitter',
       required: true,
       regex: /^[a-zA-Z0-9_]{1,15}$/,
+      validator: 'validateTwitter',
       checkDuplicate: true,
       errorMsg: 'Invalid twitter format, enter again.',
       type: 'input',
@@ -53,6 +55,7 @@ var settings = {
       name: 'Discord User Name',
       machine_name: 'discord',
       required: true,
+      validator: 'validateDiscord',
       regex: /.+/s,
       checkDuplicate: false,
       errorMsg: '',
@@ -64,6 +67,7 @@ var settings = {
       name: 'Email Address',
       machine_name: 'email',
       required: true,
+      validator: 'validateEmail',
       regex: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,4}/igm,
       checkDuplicate: true,
       errorMsg: 'Invalid Email address, enter again.',
@@ -76,6 +80,7 @@ var settings = {
       name: 'Ethereum Address',
       machine_name: 'eth_wallet',
       required: true,
+      validator: 'validateEthAddress',
       regex: /^0x[a-fA-F0-9]{40}$/g,
       checkDuplicate: true,
       errorMsg: 'Invalid Ethereum Address, enter again.',
