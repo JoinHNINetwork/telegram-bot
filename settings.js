@@ -1,13 +1,16 @@
+var discordLink = "https://discord.gg/HW82aHx";
+var twitterURL = 'https://twitter.com/FontCommunity';
+var telegramGroupURL = 'http://t.me/FontCommunityGroup';
+
 var settings = {
-  telegramGroupURL: 'http://t.me/FontCommunityGroup',
+  telegramGroupURL: telegramGroupURL,
   telegramGroupName: 'Font Community',
   thisTelegramBotURL: 'http://t.me/FontCommunityBot',
   tokenSymbol: '$FONT',
 
   //Discord stuffs
-  discordLink: "https://discord.gg/HW82aHx",
-
-  twitterURL: 'https://twitter.com/FontCommunity',
+  discordLink: discordLink,
+  twitterURL: twitterURL,
 
   logo: 'https://font.community/wp-content/uploads/2020/10/logo-blue.png',
 
@@ -15,17 +18,17 @@ var settings = {
   inputFields: {
     sts_twitter_follow: {
       //title: 'Follow our Twitter, Like and Retweet the pinned tweet',
-      title: 'Follow our Twitter, Like and Retweet the pinned tweet: https://twitter.com/FontCommunity',
+      title: 'Follow our Twitter, Like and Retweet the pinned tweet:\nhttps://twitter.com/FontCommunity',
       machine_name: 'sts_twitter_follow',
       required: true,
       type: 'button',
       regex: /.+/s,
-
+      validator: 'validateTrue',
       botOption: {
         'reply_markup': {
           'inline_keyboard': [[
             {
-              text: 'Done Step 1',
+              text: 'Done Twitter Task',
               callback_data: '1'
             }
           ]],
@@ -49,8 +52,32 @@ var settings = {
       errorMsg: 'Invalid twitter format, enter again.',
       type: 'input',
     },
+    sts_discord_join: {
+      //title: 'Follow our Twitter, Like and Retweet the pinned tweet',
+      title: 'Join our Discord:\n' + twitterURL,
+      machine_name: 'sts_discord_join',
+      required: true,
+      type: 'button',
+      regex: /.+/s,
+      validator: 'validateTrue',
+      botOption: {
+        'reply_markup': {
+          'inline_keyboard': [[
+            {
+              text: 'Joined Discord',
+              callback_data: '1'
+            }
+          ]],
+          resize_keyboard: true,
+          one_time_keyboard: true,
+          force_reply: true,
+        }
+      },
+      value: 1,
+    },
+
     discord: {
-      title: 'Discord User name',
+      title: 'Enter your Discord User name',
       description: 'Discord User name',
       name: 'Discord User Name',
       machine_name: 'discord',
@@ -58,7 +85,7 @@ var settings = {
       validator: 'validateDiscord',
       regex: /.+/s,
       checkDuplicate: false,
-      errorMsg: '',
+      errorMsg: 'Invalid Discord Username format, enter again.',
       type: 'input',
     },    
     email: {
@@ -85,6 +112,29 @@ var settings = {
       checkDuplicate: true,
       errorMsg: 'Invalid Ethereum Address, enter again.',
       type: 'input',
+    },
+    sts_tg_group: {
+      //title: 'Follow our Twitter, Like and Retweet the pinned tweet',
+      title: 'Join our Telegram Group:\n' + telegramGroupURL,
+      machine_name: 'sts_tg_group',
+      required: true,
+      type: 'button',
+      regex: /.+/s,
+      validator: 'validateTrue',
+      botOption: {
+        'reply_markup': {
+          'inline_keyboard': [[
+            {
+              text: 'Joined Telegram group',
+              callback_data: '1'
+            }
+          ]],
+          resize_keyboard: true,
+          one_time_keyboard: true,
+          force_reply: true,
+        }
+      },
+      value: 1,
     },
 
   },

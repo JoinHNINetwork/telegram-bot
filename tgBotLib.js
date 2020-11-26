@@ -3,6 +3,8 @@ const _ = require('underscore');
 const config = require('./config')
 const settings = require('./settings').settings
 var sqlite = require('sqlite-sync'); //requiring
+let logger = require('logat')
+
 
 
 var token = config.token;
@@ -11,12 +13,16 @@ const ANSWER_NO_ERROR = 0;
 const ANSWER_WRONG_FORMAT = 1;
 const ANSWER_DUPLICATE_DATA = 2;
 const ANSWER_SKIP_INPUT = 3;
+const ANSWER_UNKNOWN = 4;
+
+const ANSWER_BUTTON_SAVED = 11;
+const ANSWER_BUTTON_NOT_SAVED = 12;
 
 const BUTTON_INPUT_NO_STATUS = 0;
 const BUTTON_INPUT_ACK_BY_USER = 1;
 const BUTTON_INPUT_ACK_BY_USER_NOT_DONE = 2;
 const BUTTON_INPUT_ACK_BY_USER_AND_VERIFIED = 3;
-const BUTTON_INPUT_SKIP_BY_USER = 4;
+const BUTTON_INPUT_SKIP_BY_USER = 4; 
 
 
 // Create a bot that uses 'polling' to fetch new updates
@@ -27,7 +33,7 @@ const img_url = settings.logo;
 //Todo move to 
 var _opt = {
   parse_mode: 'HTML',
-  disable_web_page_preview: true
+  disable_web_page_preview: true 
 }
 
 
@@ -50,9 +56,8 @@ exports.getInput = getInput;
 
 //Check if incoming message is reply_markup / inline_keyboard
 function checkMsgReplyMarkup(msg) {
-  if(_.has(msg, 'message') && _.has(msg.message, 'reply_markup')) {
+  if(msg && _.has(msg, 'message') && _.has(msg.message, 'reply_markup')) {
     return true;
-    console.log("inline message", msg.message.reply_markup);
   }
   return false;
 }
@@ -71,8 +76,8 @@ function sendRules(msg, bot, prefill = false) {
 
   var name = "<b>" + msg.from.first_name + "(" + msg.from.username + ")" + "</b>";
 
-  var welcomeText = "Hello " + name + "\n\nWelcome to " + settings.telegramGroupName + "!\
-  Join our community and refer to get upto $5000 worth of "+ settings.tokenSymbol +" tokens.\n\n";
+  var welcomeText = "Hello " + name + "\n\nWelcome to " + settings.telegramGroupName + "!. Fonts are DeFi enabled NFTs, marketplace governed by DAO.\n\n";
+  welcomeText = welcomeText + "Join our community and refer to get upto $5000 worth of "+ settings.tokenSymbol +" tokens.\n\n";
 
   welcomeText = welcomeText + "<b>Your referal link : </b>" + getReferralLink(msg.from.id);
 
@@ -103,7 +108,7 @@ function sendRules(msg, bot, prefill = false) {
     _isDone = _tick_mark;
     _answer = "<b>: " + userData.twitter + "</b>";
   }
-  rules = rules + "\n<pre>2." + _isDone + " Enter your Twitter ID " + _answer + ".</pre>";
+  rules = rules + "\n<pre>2." + _isDone + " Enter your Twitter ID" + _answer + "</pre>";
 
   //Rule 4 Join the Discord Server
   rules = rules + "\n<pre>3. Join our Discord</pre> \n" + settings.discordLink + " \n";
@@ -139,7 +144,7 @@ function sendRules(msg, bot, prefill = false) {
   rules = rules + "\n<pre>7. Join our " + settings.telegramGroupName + " Telegram group </pre>\n"
   rules = rules + settings.telegramGroupURL + "\n";
 
-    
+  rules = rules + "\n<code>[=======  <b>Start Fill</b>  ========]</code>\n";
 
   var initial_message = welcomeText + rules;
 
@@ -153,7 +158,7 @@ function sendRules(msg, bot, prefill = false) {
   }
   else {
     console.log("from send rules: If not all filled");
-    askNextQuestion(msg, bot, true); 
+    //askNextQuestion(msg, bot, true); 
   }
 
   //Ask first question after rules 
@@ -194,6 +199,21 @@ function allFilled(msg, bot) {
 exports.allFilled = allFilled;
 
 
+function thankYouNote(tg_user_id) {
+  var user = loadUser(tg_user_id);
+  var ref_link = getReferralLink(tg_user_id);
+  var _output = 'Thanks for providing the info.\n\n';
+  _output = _output + 'Now, you can refer more friends to earn more tokens.\n';
+  _output = _output + '<b>Here is the referral link: ' + ref_link + '</b>\n\n';
+
+  _output = _output + 'To know more about token balance type /balance\n\n';
+  _output = _output + 'Also, you fill your form - How can you help us to grow?\n';
+  _output = _output + 'link@todo\n\n\n';
+
+  _output = _output + 'Thank you!!!\n\n';
+  return _output;
+}
+
 //get the current user, current question and current answer and return status 
 //return 0 on no error ANSWER_NO_ERROR
 //return 1 on wrong format ANSWER_WRONG_FORMAT
@@ -216,8 +236,12 @@ function verifyCurQuestionAnswer(msg){
     //Sanitize the input
     var answer = msg.text.toLowerCase();
     if(_.has(settings.inputFields[_cur_question], 'validator')) {
-      answer = settings.inputFields[_cur_question]['validator'](answer);
-      console.log("sanitized anser", answer, _cur_question);
+      var _validator_function_string = settings.inputFields[_cur_question].validator;
+       
+      if (_validator_function_string) { 
+        answer = validatorSelect(_validator_function_string, answer);
+        console.log("sanitized anser", answer, _cur_question); 
+      } 
     }
 
     //Check if answer is right 
@@ -239,19 +263,65 @@ function verifyCurQuestionAnswer(msg){
   }
 
   //Validate the 'input' questions
-  if(_question_type == 'button') {
+  if(_question_type == 'button') { 
     //@todo later 
-
-
+    var buttonSaveStatus = buttonDataSave(msg);
+    if(buttonSaveStatus) {
+      return ANSWER_BUTTON_SAVED;
+    }
+    return ANSWER_BUTTON_NOT_SAVED;
   }
 
-  return -1;
+  return ANSWER_UNKNOWN;
 
   //Save the answer and return the status
 
 }
+exports.verifyCurQuestionAnswer = verifyCurQuestionAnswer;
 
 
+function cleanupMarkupReplyMsg(msg){
+  if(checkMsgReplyMarkup(msg)) {
+    const message = msg.message;  
+    let _msg_updated = JSON.parse(JSON.stringify(message));
+    _msg_updated.from = msg.from;
+    delete _msg_updated.reply_markup;
+    return _msg_updated;
+  }
+  return false;
+}
+exports.cleanupMarkupReplyMsg = cleanupMarkupReplyMsg;
+
+
+function buttonDataSave(oldmsg) {
+  var msg = cleanupMarkupReplyMsg(oldmsg);
+  console.log("buttons samve", msg);
+  if(msg) {
+    const answer = parseInt(oldmsg.data); 
+    if(answer != 1) {
+      return false;
+    }
+    var _option_question = oldmsg.message.reply_markup.inline_keyboard[0][0].text;
+
+    switch(_option_question) {
+      case 'Done Twitter Task':
+        updateUserField(msg.from.id, 'sts_twitter_follow', 1);
+        return true;  
+        
+      break; 
+      case 'Joined Discord':
+        updateUserField(msg.from.id, 'sts_discord_join', 1);
+        return true;
+      break;
+      case 'Joined Telegram group':
+        updateUserField(msg.from.id, 'sts_tg_group', 1);
+        return true;
+      break;
+    } 
+  }
+  return false;
+}
+exports.buttonDataSave = buttonDataSave;
 
 //Better replacements for questionrepeater
 function taskRepeater(msg, bot, commends_ok = false) {
@@ -264,38 +334,61 @@ function taskRepeater(msg, bot, commends_ok = false) {
     return false;
   }
   
+  var _status = verifyCurQuestionAnswer(msg);
+  var next_question = getUnfilledField(msg.from.id);
+
   if(_question_type == 'input') {
-    askQuestion(_cur_question, msg, bot, false).then(()=>{
-      var _status = verifyCurQuestionAnswer(msg);
-      switch(_status) {
-        case ANSWER_NO_ERROR:
-          var next_question = getUnfilledField(msg.from.id);
-          if(next_question) {
-            return askQuestion(next_question, msg, bot, false).then(()=>{return false;});
-          }
-          else {
-            allFilled(msg, bot); //Tell everything filled
-            return false;            
-          }
-          //Ask next question 
-        break;
-        case ANSWER_DUPLICATE_DATA:
-          return askQuestion(next_question, msg, bot, ANSWER_DUPLICATE_DATA).then(()=>{return false;});
-          //Warn about duplicate data and ask next question
-        break;
-        case ANSWER_WRONG_FORMAT:
-          //Warn about wrong format and ask next question 
-          return askQuestion(next_question, msg, bot, ANSWER_WRONG_FORMAT).then(()=>{return false;});
-        break;
-        case ANSWER_SKIP_INPUT:
-          //Do nothing now, just console log it
-          console.log("nothing to do");
-        break;            
-      }    
-    });
+    switch(_status) {
+      case ANSWER_NO_ERROR:
+        //Ask next question, may be say thank you 
+        if(next_question) {
+          return askQuestion(next_question, msg, bot, false).then(()=>{return false;});
+        }
+        else {
+          allFilled(msg, bot); //Tell everything filled
+          return false;            
+        }      
+      break;
+      case ANSWER_DUPLICATE_DATA:
+        //Show error and ask question again
+        return askQuestion(next_question, msg, bot, ANSWER_DUPLICATE_DATA).then(()=>{return false;});
+      break;
+
+      case ANSWER_WRONG_FORMAT:
+        //Show error and ask question again
+        console.log("nothing to do ANSWER_WRONG_FORMAT");
+        return askQuestion(next_question, msg, bot, ANSWER_WRONG_FORMAT).then(()=>{return false;});
+      break;    
+
+      case ANSWER_SKIP_INPUT:
+        //@todo think
+        console.log("nothing to do ANSWER_SKIP_INPUT");
+      break;    
+
+      case ANSWER_UNKNOWN:
+        //Ask the question
+        if(next_question) {
+          return askQuestion(next_question, msg, bot, false).then(()=>{return false;});
+        }
+        else {
+          allFilled(msg, bot); //Tell everything filled
+          return false;            
+        }      
+      break;
+    }
   }
+
+
   if(_question_type == 'button') {    
 
+    switch(_status) {
+      case ANSWER_BUTTON_SAVED:
+        return showOptions(next_question, msg,bot).then((r)=>{return r;});
+      break;
+      case ANSWER_BUTTON_NOT_SAVED:
+        return showOptions(next_question, msg,bot).then((r)=>{return r;});
+      break;      
+    }
   }
 }
 exports.taskRepeater = taskRepeater;
@@ -394,15 +487,17 @@ function askNextQuestion(msg, bot, displayFilled = false){
   }  
   return false;
 }
+exports.askNextQuestion = askNextQuestion;
 
 
 //Todo check if current answer is not valid for current question
 //@todo display error of duplicate and error of wrong format  
 function askQuestion(field, msg, bot, error = false) {
-  console.log("ask question");
-  //console.log("askQuestion", field, msg);
+  
+  
   var errorMsg = '';
   var _input = settings.inputFields[field];
+  
   var answer = msg.text.toLowerCase();
   switch(error) {
     case ANSWER_DUPLICATE_DATA:
@@ -410,17 +505,20 @@ function askQuestion(field, msg, bot, error = false) {
     break;
 
     case ANSWER_WRONG_FORMAT:
-      errorMsg = '<code>' + _input.errorMsg + '</code>';
+      if(_.has(_input, 'errorMsg')) {
+        errorMsg = '<code>' + _input.errorMsg + '</code>'; 
+      }
     break;
   }
-  var question = '<pre>' + settings.inputFields[field].title + '</pre>';
+  var question = '<pre>' + _input.title + '</pre>';
+  
   if(error && errorMsg) {
-    return bot.sendMessage(msg.chat.id, errorMsg, _opt).then(() => {
-      return bot.sendMessage(msg.chat.id, question, _opt);
-    });
+    var question_error = errorMsg + '\n\n';
+    question_error = question_error + question;    
+    return bot.sendMessage(msg.chat.id, question_error, _opt).then((r)=> {return r});
   }
   else {
-    return bot.sendMessage(msg.chat.id, question, _opt);
+    return bot.sendMessage(msg.chat.id, question, _opt).then((r)=> {return r});
   }
   return false;
   
@@ -507,7 +605,7 @@ function getUnfilledField(tg_user_id, allfield_return_minus_1 = false) {
   if(!user) {
     return false;
   }
-  var fields = ['sts_twitter_follow', 'twitter', 'discord' , 'email', 'eth_wallet'];//@todo Automate this later 
+  var fields = getFieldsToFill();
   for(let field in fields) {
     if(!user[fields[field]]) {
       return fields[field];
@@ -560,28 +658,14 @@ function createUser(tg_user_id, tg_username, tg_display_name, email = null, twit
 exports.createUser = createUser;
 
 
-//Get unfilled field of an user
-function getUnfilledField(tg_user_id, allfield_return_minus_1 = false) {
-  var user = loadUser(tg_user_id);
-  if(!user) {
-    return false;
-  }
-  var fields = ['sts_twitter_follow', 'twitter', 'discord' , 'email', 'eth_wallet'];//@todo Automate this later 
-  for(let field in fields) {
-    if(!user[fields[field]]) {
-      return fields[field];
-    }
-  }
-  if(allfield_return_minus_1) {
-    return -1;
-  }
-  return false;
+function getFieldsToFill(){
+  //Todo automate this from settings
+  return ['sts_twitter_follow', 'twitter', 'sts_discord_join', 'discord' , 'email', 'eth_wallet', 'sts_tg_group'];
 }
-exports.getUnfilledField = getUnfilledField;
 
 //function return boolean if none of the field filled
 function GetUnfilledUserFieldCount(tg_user_id){
-  var _fields_to_check = ['sts_twitter_follow', 'twitter', 'discord' , 'email', 'eth_wallet', 'sts_tg_group', 'sts_discord_join'];
+  var _fields_to_check = getFieldsToFill();
   var user = loadUser(tg_user_id);
   var filled = 0;
   if(user) {
@@ -654,7 +738,7 @@ exports.updateUserField = updateUserField;
 
 
 //Setup the database table
-function setupTable(tablename) {
+function setupTable(tablename) { 
   if(!tablename) {
     tablename = 'telegrambot';
   }
@@ -686,11 +770,25 @@ exports.setupTable = setupTable;
 
 
 //Function that prints console log
-function tgDebug(){
-  console.log(arguments);
+function tgDebug(myVar){
+  console.log("DEBUG", (new Error().stack.split("at ")[1]).trim(), ">>>", myVar);
 }
 exports.tgDebug = tgDebug;
 
+
+function echo() {
+  var args, file, frame, line, method;
+  args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+
+  frame = stackTrace.get()[1];
+  file = path.basename(frame.getFileName());
+  line = frame.getLineNumber();
+  method = frame.getFunctionName();
+
+  args.unshift("" + file + ":" + line + " in " + method + "()");
+  return log.info.apply(log, args); // changed 'debug' to canonical npmlog 'info'
+};
+exports.echo = echo;
 
 //Check if this function is a command
 function isCommand(msg, find = '/start'){
@@ -739,7 +837,8 @@ function commandParser(msg, match, bot) {
     return true;
   }
   sendRules(msg, bot, true);
-  askNextQuestion(msg, bot, false);
+  taskRepeater(msg,bot);
+  //askNextQuestion(msg, bot, false);
   //Converstion 
   //if(!isCommand(msg)) {
     //taskRepeater(msg, bot);  
@@ -764,6 +863,31 @@ function getCommandArgumets(str, command = '/start ') {
 }
 exports.getCommandArgumets = getCommandArgumets;
 
+function validatorSelect(fun, argu) {
+  switch(fun) {
+    case 'validateTwitter':
+      return validateTwitter(argu);
+    break;
+    case 'validateTrue':
+      return validateTrue(argu);
+    break;
+    case 'validateEmail':
+      return validateEmail(argu);
+    break;
+    case 'validateDiscord':
+      return validateDiscord(argu);
+    break;            
+    case 'validateEthAddress':
+      return validateEthAddress(argu);
+    break;       
+    default:
+      return validateTrue(argu);
+
+  }
+  return validateTrue(argu);
+
+}
+
 //Validate and sanitize the twitter account   
 function validateTwitter(handle) { 
   if (handle.match(/^((?:http:\/\/)?|(?:https:\/\/)?)?(?:www\.)?twitter\.com\/(\w+)$/i)){
@@ -772,13 +896,18 @@ function validateTwitter(handle) {
   if(handle.indexOf('@') > -1) {
     handle = handle.split("@").pop();
   }  
-  if(handle.match(/^@?(\w+)$/)) {
+  if(handle.match(/^@?(\w){1,15}$/)) {
     return handle;
   }
   return false;  
 }
-exports.validateTwitter = validateTwitter;
+exports.validateTwitter = validateTwitter;  
 
+//This validator return true all the time
+function validateTrue(nothing){
+  return true;
+}
+exports.validateTrue = validateTrue;
 
 function validateEmail(email) {
   const re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
@@ -791,9 +920,9 @@ function validateEmail(email) {
 exports.validateEmail = validateEmail;
 
 function validateDiscord(username) {
-  const re = /^((.+?)#\d{4})/;
-  username = String(username).toLowerCase();
-  if(re.test(username)) {
+  const re = /^[^#]{2,32}#\d{4}$/;
+  //username = String(username).toLowerCase();
+  if(username && re.test(username)) {
     return username;
   }
   return false;

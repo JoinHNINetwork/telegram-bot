@@ -32,21 +32,24 @@ bot.on('new_chat_members', (msg) => {
 });
 
 //Record the inviter
+//@todo combaing next 2 functions into one 
 bot.onText(/\/start(.+)/, (msg, match) => { // (.+)
   var tg_user_id = tgBot.getReferralCode(msg, match);
   if(tg_user_id) {
     tgBot.upsertUser(msg.from.id, msg.from.username, msg.from.first_name, "", "", "", "", tg_user_id);
+    tgBot.commandParser(msg, match, bot);  
   }
   else {
     tgBot.upsertUser(msg.from.id, msg.from.username, msg.from.first_name);
   }
-  tgBot.commandParser(msg, match, bot);  
+  
 })
 
 //on just with start 
 bot.onText(/\/start/, (msg, match) => { // (.+)
   var text = msg.text.trim().substring(6).trim();
   if(!text) {
+    console.log("/start");
     tgBot.upsertUser(msg.from.id, msg.from.username, msg.from.first_name);
     tgBot.commandParser(msg, match, bot);  
   }
@@ -65,40 +68,11 @@ bot.on("polling_error", (err) => tgBot.tgDebug(err));
 
 // Listener (handler) for callback data from /label command
 bot.on('callback_query', (msg) => {
-   //console.log("msg from callback", msg);
-   const message = msg.message;
-   
-   //console.log(util.inspect(msg, false, null, true /* enable colors */));
+  console.log("cbq", msg);
+  var buttonSaveStatus = tgBot.buttonDataSave(msg);
+  var msgNew = tgBot.cleanupMarkupReplyMsg(msg);  
+  tgBot.askNextQuestion(msgNew, bot);
 
-
-   //Callback query have different format, fix it
-   let _msg_updated = JSON.parse(JSON.stringify(message));
-
-   _msg_updated.from = msg.from;
-   delete _msg_updated.reply_markup;
-   //console.log("msg from callback modifed", _msg_updated);
-
-   const answer = msg.data; 
-   var _option_question = msg.message.reply_markup.inline_keyboard[0][0].text;
-   //@todo get this stuff from settings 
-   tgBot.checkMsgReplyMarkup(msg);
-   switch(_option_question) {
-     case 'Done Step 1':
-       if(answer === '1') {
-         tgBot.updateUserField(_msg_updated.from.id, 'sts_twitter_follow', 1);
-         
-         tgBot.askNextQuestion(_msg_updated, bot, false); //@todo ask next question directly 
-
-
-       }
-     break; 
-     case 'Done Step 2':
-
-
-     break;
-
-
-   } 
 });
 
  

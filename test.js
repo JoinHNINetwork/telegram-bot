@@ -8,8 +8,27 @@ var sqlite = require('sqlite-sync'); //requiring
 var token = config.token;
 
 //const TG = require('telegram-bot-api')
+testdiscord();
 
+function testdiscord() {
+  var strs = [
+    'adal@234',
+    '234@234',
+    'adal#2344',
+    '234#2344',
+    'adal#244',
+    '234#244',    
+    'adalar',
+    '234',        
+  ];
+for(var _index in strs) {
+  var str = strs[_index];
+  var yes = validateDiscord(str) ? 'yes' : 'no';
+  console.log(str, yes);
+}  
+}
 
+function testtwitter() {
 var strs = [
   'https://twitter.com',
   'http://twitter.com',
@@ -28,6 +47,17 @@ for(var _index in strs) {
   var str = strs[_index];
   var yes = isTwitterHandle(str) ? 'yes' : 'no';
   console.log(str, yes);
+}
+}
+
+function validateDiscord(username) {
+  const re = /^[^#]{2,32}#\d{4}$/;
+
+  //username = String(username).toLowerCase();
+  if(username && re.test(username)) {
+    return username;
+  }
+  return false;
 }
 
 function isTwitterHandle(handle) { 
